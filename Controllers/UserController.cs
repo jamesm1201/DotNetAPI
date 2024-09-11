@@ -19,18 +19,43 @@ public class UserController : ControllerBase
     }
     //IActionResult means API response
     // public IActionResult Test()
-
-    //Allows for the request to be passed to function using testValue var
-    [HttpGet("GetUsers/{testValue}")]
-    public string[] GetUsers(string testValue)
+    
+    [HttpGet("GetUsers")]
+    //This will return an IEnumerable of all user models in DB
+    public IEnumerable<User> GetUsers()
     {
-        string[] responseArray = new string[]{
-            "test1",
-            "test2",
-            "test3",
-            testValue
-        };
-        return responseArray;
+        /*SQl command for dapper to use
+        @ allows for multiple lines of string*/
+        string sql = @"
+            SELECT[UserId],
+                [FirstName],
+                [LastName],
+                [Email],
+                [Gender],
+                [Active]
+            FROM TutorialAppSchema.Users";
+        /*_dapper is instance of dataContextDapper 
+        it is passed the sql and result is put into users*/
+        IEnumerable<User> users = _dapper.LoadData<User>(sql);
+        return users;
+    }
+
+    //Will pass the int user ID parameter to be searched with
+    [HttpGet("GetSingleUser/{userId}")]
+    //Returns a single model (user)
+    public User GetSingleUser(int userId)
+    {
+        string sql = @"
+            SELECT[UserId],
+                [FirstName],
+                [LastName],
+                [Email],
+                [Gender],
+                [Active]
+            FROM TutorialAppSchema.Users
+                WHERE UserId = " + userId.ToString();
+        User user = _dapper.LoadDataSingle<User>(sql);
+        return user;
     }
 }
 
