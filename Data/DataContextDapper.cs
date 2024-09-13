@@ -2,7 +2,8 @@ using System.Data;
 using Microsoft.Data.SqlClient;
 using Dapper;
 
-namespace DotNetAPI{
+namespace DotNetAPI.Data 
+{
     class DataContextDapper{
         private readonly IConfiguration _config;
 
