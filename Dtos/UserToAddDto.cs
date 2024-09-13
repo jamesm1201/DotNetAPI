@@ -1,8 +1,7 @@
-namespace DotNetAPI.Models
+namespace DotNetAPI.Dtos
 {
     //Partial allows it to be added to from another class
-    public partial class User {
-        public int UserId {get; set;}
+    public partial class UserToAddDto {
         public string FirstName {get; set;}
         public string LastName {get; set;}
         public string Email {get; set;}
@@ -10,7 +9,7 @@ namespace DotNetAPI.Models
         public bool Active {get; set;}
 
     //In order to stop errors - string properties are set to empty instead of null
-        public User(){
+        public UserToAddDto(){
             if (FirstName == null){
                 FirstName = "";
             }
