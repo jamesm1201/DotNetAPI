@@ -37,19 +37,8 @@ namespace DotNetAPI.Controllers
                     using(RandomNumberGenerator rng = RandomNumberGenerator.Create()){
                         rng.GetNonZeroBytes(passwordSalt);
                     }
-                    /*Combines random generated salt with key*/
-                    string passwordSaltPlusString = _config.GetSection("AppSettings:PasswordKey")
-                        .Value + Convert.ToBase64String(passwordSalt);
-                    
-                    byte[] passwordHash = KeyDerivation.Pbkdf2(
-                        password: userForReg.Password,
-                        salt: Encoding.ASCII.GetBytes(passwordSaltPlusString),
-                        //How random hash will be
-                        prf: KeyDerivationPrf.HMACSHA256,
-                        //How many times it will be hashed
-                        iterationCount: 100000,
-                        numBytesRequested: 256/8
-                    );
+
+                    byte[] passwordHash = GetPasswordHash(userForReg.Password, passwordSalt);
 
                     string sqlAddAuth = @"INSERT INTO TutorialAppSchema.Auth([Email],
                     [PasswordHash],
@@ -77,7 +66,39 @@ namespace DotNetAPI.Controllers
 
         [HttpPost("Login")]
         public IActionResult Login(UserForLoginDto userForLogin){
+            string sqlForHashAndSalt = @"SELECT [PasswordHash], 
+                PasswordSalt FROM TutorialAppSchema.Auth 
+                WHERE Email = '" +
+                userForLogin.Email + "'";
+            UserForLoginConfirmDto userForConfirm = _dapper
+                .LoadDataSingle<UserForLoginConfirmDto>(sqlForHashAndSalt);
+            
+            //uses same method as reg to compare hashed (DB stored salt and password)
+            byte[] passwordHash = GetPasswordHash(userForLogin.Password, userForConfirm.PasswordSalt);
+
+            /*Loop throug byte arrays to check they are the same
+            Can't directly compare == because it will compare pointers
+            of hash objects*/
+            for (int index = 0; index < passwordHash.Length; index++){
+                if(passwordHash[index] != userForConfirm.PasswordHash[index] ){
+                    return StatusCode(401, "Incorrect Password");
+                }
+            }
             return Ok();
+        }
+
+        private byte[] GetPasswordHash(string password, byte[] passwordSalt){
+            string passwordSaltPlusString = _config.GetSection("AppSettings:PasswordKey")
+                .Value + Convert.ToBase64String(passwordSalt);
+            return KeyDerivation.Pbkdf2(
+                password: password,
+                salt: Encoding.ASCII.GetBytes(passwordSaltPlusString),
+                //How random hash will be
+                prf: KeyDerivationPrf.HMACSHA256,
+                //How many times it will be hashed
+                iterationCount: 100000,
+                numBytesRequested: 256/8
+            );
         }
     }
 }
