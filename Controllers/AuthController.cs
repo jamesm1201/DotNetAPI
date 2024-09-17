@@ -55,7 +55,22 @@ namespace DotNetAPI.Controllers
                     sqlParameters.Add(passwordHashParameter);
 
                     if(_dapper.ExecuteSqlWithParams(sqlAddAuth, sqlParameters)){
-                        return Ok();
+                        string sqlAddUser = @"INSERT INTO TutorialAppSchema.Users(
+                            [FirstName],
+                            [LastName],
+                            [Email],
+                            [Gender],
+                            [Active]
+                            ) VALUES (" +
+                                "'" + userForReg.FirstName + 
+                                "', '" + userForReg.FirstName + 
+                                "', '" + userForReg.Email + 
+                                "', '" + userForReg.Gender + 
+                                "', 1)";
+                        if(_dapper.ExecuteSql(sqlAddUser)){
+                            return Ok();
+                        }
+                        throw new Exception("Failed to add user");
                     }
                     throw new Exception("Failed to register user");
                 }
