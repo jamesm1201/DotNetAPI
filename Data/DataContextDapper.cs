@@ -31,5 +31,21 @@ namespace DotNetAPI.Data
             IDbConnection dbConnection = new SqlConnection(_config.GetConnectionString("DefaultConnection"));
             return dbConnection.Execute(sql);
         }
+
+         public bool ExecuteSqlWithParams(string sql, List<SqlParameter> parameters){
+            SqlCommand commandWithParams = new SqlCommand(sql);
+            foreach(SqlParameter parameter in parameters){
+                commandWithParams.Parameters.Add(parameter);
+            }
+            //Don't use IDbConnection
+            SqlConnection dbConnection = new SqlConnection(_config.GetConnectionString("DefaultConnection"));
+            dbConnection.Open();
+            commandWithParams.Connection = dbConnection;
+            int rowsAffected = commandWithParams.ExecuteNonQuery();
+            //Remember to open and close connection properly
+            dbConnection.Close();
+            return rowsAffected > 0;
+
+        }
     }
 }
