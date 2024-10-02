@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.Data;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using DotNetAPI.Data;
@@ -7,6 +9,7 @@ using DotNetAPI.Dtos;
 using Microsoft.AspNetCore.Cryptography.KeyDerivation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
+using Microsoft.IdentityModel.Tokens;
 
 namespace DotNetAPI.Controllers
 {
@@ -99,7 +102,16 @@ namespace DotNetAPI.Controllers
                     return StatusCode(401, "Incorrect Password");
                 }
             }
-            return Ok();
+            //Creates a sql statement to get user ID from user logging in using email
+            string userIdSql = @"
+                    SELECT UserId FROM TutorialAppSchema.Users 
+                        WHERE Email = '" + userForLogin.Email + "'";
+            
+            int userId = _dapper.LoadDataSingle<int>(userIdSql);
+            //Generates a token on login
+            return Ok(new Dictionary<string, string> {
+                {"token", CreateToken(userId)}
+            });
         }
 
         private byte[] GetPasswordHash(string password, byte[] passwordSalt){
@@ -114,6 +126,31 @@ namespace DotNetAPI.Controllers
                 iterationCount: 100000,
                 numBytesRequested: 256/8
             );
+        }
+
+        private string CreateToken(int userId){
+            Claim[] claims = new Claim[] {
+                new Claim("userId", userId.ToString())
+            };
+
+            SymmetricSecurityKey tokenKey = new SymmetricSecurityKey
+                (Encoding.UTF8.GetBytes
+                    (_config.GetSection("AppSettings:TokenKey").Value)
+                );
+            
+            SigningCredentials credentials = new SigningCredentials(tokenKey, SecurityAlgorithms.HmacSha512Signature);
+
+            SecurityTokenDescriptor descriptor = new SecurityTokenDescriptor(){
+                Subject = new ClaimsIdentity(claims),
+                SigningCredentials = credentials,
+                //How long token lasts for before relogging in
+                Expires = DateTime.Now.AddDays(1)
+            };
+
+            //Handler uses descriptor to create token
+            JwtSecurityTokenHandler tokenHandler = new JwtSecurityTokenHandler();
+            SecurityToken token = tokenHandler.CreateToken(descriptor);
+            return tokenHandler.WriteToken(token);
         }
     }
 }
