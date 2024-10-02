@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using DotNetAPI.Data;
 using DotNetAPI.Dtos;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cryptography.KeyDerivation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -13,6 +14,9 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace DotNetAPI.Controllers
 {
+    [Authorize]
+    [ApiController]
+    [Route("[controller]")]
     public class AuthController : ControllerBase 
     {
         private readonly DataContextDapper _dapper;
@@ -23,7 +27,9 @@ namespace DotNetAPI.Controllers
             _dapper = new DataContextDapper(config);
             _config = config;
         }
-
+        /*Allows endpoint to recieve anonymous request
+        i.e. User doesn't have to have valid JWT token to use*/
+        [AllowAnonymous]
         [HttpPost("Register")]
         /**/
         public IActionResult Register(UserForRegistrationDto userForReg){
@@ -81,7 +87,7 @@ namespace DotNetAPI.Controllers
             }
             throw new Exception("Passwords do not match");
         }
-
+        [AllowAnonymous]
         [HttpPost("Login")]
         public IActionResult Login(UserForLoginDto userForLogin){
             string sqlForHashAndSalt = @"SELECT [PasswordHash], 
@@ -114,6 +120,23 @@ namespace DotNetAPI.Controllers
             });
         }
 
+        [HttpGet("RefreshToken")]
+        /*Takes a token and finds the user id hidden inside
+        If userId found matches one from database then token is valid
+        Then generates a new token */
+        public IActionResult RefreshToken(){
+            string userId = User.FindFirst("userId")?.Value + "";
+            
+            string userIdSql = "SELECT userId FROM TutorialAppSchema.User WHERE UserId = "
+            + userId;
+            //Grabs yser ID from db
+            int userIdFromDB = _dapper.LoadDataSingle<int>(userIdSql);
+            //Returns if it worked
+            return Ok(new Dictionary<string, string> {
+                {"token", CreateToken(userIdFromDB)}
+            });
+        }
+
         private byte[] GetPasswordHash(string password, byte[] passwordSalt){
             string passwordSaltPlusString = _config.GetSection("AppSettings:PasswordKey")
                 .Value + Convert.ToBase64String(passwordSalt);
@@ -133,9 +156,11 @@ namespace DotNetAPI.Controllers
                 new Claim("userId", userId.ToString())
             };
 
+            string? tokenKeyString = _config.GetSection("AppSettings:TokenKey").Value;
+
             SymmetricSecurityKey tokenKey = new SymmetricSecurityKey
                 (Encoding.UTF8.GetBytes
-                    (_config.GetSection("AppSettings:TokenKey").Value)
+                    (tokenKeyString != null ? tokenKeyString: "")
                 );
             
             SigningCredentials credentials = new SigningCredentials(tokenKey, SecurityAlgorithms.HmacSha512Signature);
